@@ -1,0 +1,11 @@
+[package]
+name = "witch-sim"
+version = "0.1.0"
+authors = ["Sam Collard <swift@swifteagle.co.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rltk = "0.5.14"
+specs = { version = "0.15.1", features = ["specs-derive"] }
