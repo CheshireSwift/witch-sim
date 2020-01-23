@@ -7,24 +7,24 @@ use std::cmp::{max, min};
 use types::core::*;
 use types::render::*;
 
-// State gets a new World entry for Specs, an RNG, and a score counter
+// State gets a new World entry for Specs, an RNG, and a timer
 struct State {
   ecs: World,
   time: f32,
   // rng: rltk::RandomNumberGenerator,
 }
 
-static MAX_X: i32 = 79;
-static MAX_Y: i32 = 49;
+static MAX_X: i32 = 127;
+static MAX_Y: i32 = 71;
 
 impl GameState for State {
   fn tick(&mut self, ctx: &mut Rltk) {
     ctx.cls();
 
+    render::run(ctx, &self.ecs, RGB::named(rltk::DARKGREEN));
+
     // Readable data stores
     let mut positions = self.ecs.write_storage::<Pos>();
-    let renderables = self.ecs.read_storage::<Renderable>();
-    let additional_renderables = self.ecs.read_storage::<AdditionalRenderables>();
     let mut players = self.ecs.write_storage::<Player>();
 
     // Player movement
@@ -32,16 +32,32 @@ impl GameState for State {
       match ctx.key {
         None => {} // Nothing happened
         Some(key) => match key {
-          VirtualKeyCode::Left | VirtualKeyCode::A => {
+          VirtualKeyCode::Numpad7 => {
             pos.x = max(pos.x - 1, 0);
-          }
-          VirtualKeyCode::Right | VirtualKeyCode::D => {
-            pos.x = min(pos.x + 1, MAX_X);
-          }
-          VirtualKeyCode::Up | VirtualKeyCode::W => {
             pos.y = max(pos.y - 1, 0);
           }
-          VirtualKeyCode::Down | VirtualKeyCode::S => {
+          VirtualKeyCode::Numpad9 => {
+            pos.x = min(pos.x + 1, MAX_X);
+            pos.y = max(pos.y - 1, 0);
+          }
+          VirtualKeyCode::Numpad1 => {
+            pos.x = max(pos.x - 1, 0);
+            pos.y = min(pos.y + 1, MAX_Y);
+          }
+          VirtualKeyCode::Numpad3 => {
+            pos.x = min(pos.x + 1, MAX_X);
+            pos.y = min(pos.y + 1, MAX_Y);
+          }
+          VirtualKeyCode::Left | VirtualKeyCode::A | VirtualKeyCode::Numpad4 => {
+            pos.x = max(pos.x - 1, 0);
+          }
+          VirtualKeyCode::Right | VirtualKeyCode::D | VirtualKeyCode::Numpad6 => {
+            pos.x = min(pos.x + 1, MAX_X);
+          }
+          VirtualKeyCode::Up | VirtualKeyCode::W | VirtualKeyCode::Numpad8 => {
+            pos.y = max(pos.y - 1, 0);
+          }
+          VirtualKeyCode::Down | VirtualKeyCode::S | VirtualKeyCode::Numpad2 => {
             pos.y = min(pos.y + 1, MAX_Y);
           }
           VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter => {}
@@ -77,11 +93,9 @@ impl GameState for State {
     //   // }
     // }
 
-    render::run(&ctx, &positions, &renderables, &additional_renderables);
-
     #[cfg(debug_assertions)]
     ctx.print_color(
-      40,
+      1,
       1,
       RGB::named(rltk::YELLOW),
       RGB::named(rltk::BLACK),
@@ -89,7 +103,7 @@ impl GameState for State {
     );
     #[cfg(debug_assertions)]
     ctx.print_color(
-      40,
+      1,
       2,
       RGB::named(rltk::CYAN),
       RGB::named(rltk::BLACK),
@@ -112,18 +126,22 @@ fn main() {
 
   gs.ecs
     .create_entity()
-    .with(Pos { x: 40, y: 49 })
+    .with(Pos {
+      x: MAX_X / 2,
+      y: MAX_Y / 2,
+    })
     .with(Renderable {
       glyph: rltk::to_cp437('☺'),
       fg: RGB::named(rltk::ANTIQUEWHITE),
-      bg: RGB::named(rltk::BLACK),
+      layer: layer::FORE,
+      ..Default::default()
     })
     .with(AdditionalRenderables {
       renderables: vec![AdditionalRenderable::new(
         Renderable {
           glyph: rltk::to_cp437('▲'),
-          fg: RGB::named(rltk::ANTIQUEWHITE),
-          bg: RGB::named(rltk::BLACK),
+          fg: RGB::named(rltk::DARKMAGENTA),
+          ..Default::default()
         },
         0,
         -1,
@@ -132,6 +150,32 @@ fn main() {
     .with(Player {})
     .build();
 
-  let context = Rltk::init_simple8x8(80, 50, "Witch Sim", "resources");
+  for x in 0..=MAX_X {
+    for y in 0..=MAX_Y {
+      let seed = ((((x * x + y) as f32).sin() + 1.0) * 1000.0) as i32;
+      gs.ecs
+        .create_entity()
+        .with(Pos { x: x, y: y })
+        .with(Renderable {
+          glyph: rltk::to_cp437(match seed % 4 {
+            0 => '.',
+            1 => ',',
+            2 => '\'',
+            3 => '`',
+            _ => '?',
+          }),
+          fg: if seed % 2 > 0 {
+            RGB::named(rltk::GREEN)
+          } else {
+            RGB::named(rltk::GREENYELLOW)
+          },
+          layer: layer::BACK,
+          ..Default::default()
+        })
+        .build();
+    }
+  }
+
+  let context = Rltk::init_simple8x8(MAX_X + 1, MAX_Y + 1, "Witch Sim", "resources");
   rltk::main_loop(context, gs);
 }

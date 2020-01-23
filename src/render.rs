@@ -3,28 +3,51 @@ extern crate rltk;
 // mod types;
 use crate::types::core::*;
 use crate::types::render::*;
-use rltk::{Console, GameState, Rltk, VirtualKeyCode, RGB};
+use itertools::sorted;
+use rltk::RGB;
+use rltk::{Console, Rltk};
 use specs::prelude::*;
-use std::cmp::{max, min};
+use std::cmp::Ordering;
 
-pub fn run(
-  &ctx: &Rltk,
-  &positions: &ReadStorage<Pos>,
-  &renderables: &ReadStorage<Renderable>,
-  &additional_renderables: &ReadStorage<AdditionalRenderables>,
-) {
+macro_rules! implement_unord {
+  ($t:ty) => {
+    impl Ord for $t {
+      fn cmp(&self, _other: &Self) -> Ordering {
+        Ordering::Equal
+      }
+    }
+    impl PartialOrd for $t {
+      fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+      }
+    }
+  };
+}
+
+implement_unord!(AdditionalRenderables);
+
+pub fn run(ctx: &mut Rltk, ecs: &World, background_color: RGB) {
+  let positions = ecs.read_storage::<Pos>();
+  let renderables = ecs.read_storage::<Renderable>();
+  let additional_renderables = ecs.read_storage::<AdditionalRenderables>();
+  let render_infos = (&renderables, &positions, additional_renderables.maybe()).join();
   // Draw renderables
-  for (pos, render, maybe_additionals) in
-    (positions, renderables, additional_renderables.maybe()).join()
-  {
-    ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
+  for (render, pos, maybe_additionals) in sorted(render_infos) {
+    ctx.set(
+      pos.x,
+      pos.y,
+      render.fg,
+      render.bg.unwrap_or(background_color),
+      render.glyph,
+    );
+
     if let Some(additionals) = maybe_additionals {
       for additional in &additionals.renderables {
         ctx.set(
           pos.x + additional.offset.horizontal,
           pos.y + additional.offset.vertical,
           additional.renderable.fg,
-          additional.renderable.bg,
+          additional.renderable.bg.unwrap_or(background_color),
           additional.renderable.glyph,
         );
       }
